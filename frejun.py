@@ -4,6 +4,9 @@ import json
 import logging
 import os
 from typing import Dict
+from transcription import transcribe_with_lemonfox
+import aiofiles
+
 
 router = APIRouter()
 logger = logging.getLogger("frejun")
@@ -60,18 +63,24 @@ async def stream_flow(payload: CallFlowRequest):
 @router.post('/webhook')
 async def webhook_receiver(data: Dict = Body(...)):
     logger.info(f"Frejun webhook received: {data}")
-    # handle call status updates from Frejun/Teler like call ended -> finalize
     event = data.get('event')
     call_id = data.get('call_id')
     if event == 'call.completed' and call_id:
-        # finalize: push transcript + recording to Bitrix
         info = CALLS.get(call_id, {})
         lead_id = info.get('lead_id')
-        transcript = info.get('transcript', '')
-        recording = info.get('recording_url')
+        recording_url = info.get('recording_url')
+        transcript = ""
+        if recording_url:
+            async with httpx.AsyncClient() as client:
+                r = await client.get(recording_url)
+                file_path = f"/tmp/{call_id}.wav"
+                async with aiofiles.open(file_path, "wb") as f:
+                    await f.write(r.content)
+                transcript = await transcribe_with_lemonfox(file_path)
+
         from bitrix import update_lead_with_transcript
         if lead_id:
-            await update_lead_with_transcript(lead_id, transcript, recording)
+            await update_lead_with_transcript(lead_id, transcript, recording_url)
     return {"status": "ok"}
 
 @router.get('/initiate-call')
