@@ -4,11 +4,13 @@ import os
 import logging
 import json
 from frejun import initiate_call
+import requests
 
 router = APIRouter()
 logger = logging.getLogger("bitrix")
 
 BITRIX_WEBHOOK_URL = os.getenv("BITRIX_WEBHOOK_URL")  # e.g. https://yourdomain/rest
+
 
 from urllib.parse import parse_qs
 
@@ -31,10 +33,18 @@ async def bitrix_lead_handler(request: Request):
     if not lead_id:
         raise HTTPException(status_code=400, detail="Lead ID missing")
     
-    # Fetch lead details from Bitrix
-    phone_number = await get_lead_phone(lead_id)
+    lead_url = f"{BITRIX_WEBHOOK_URL}crm.lead.get.json"
+    response = requests.get(lead_url, params={"id": lead_id})
+
     
-    lead_name = payload.get("data[FIELDS][TITLE]", [""])[0].lower() if payload.get("data[FIELDS][TITLE]") else ""
+    lead_data = response.json().get("result", {})
+    phone_number = None
+    if lead_data.get("PHONE"):
+        phone_number = lead_data["PHONE"][0].get("VALUE")
+    
+    lead_name = lead_data.get("TITLE")
+
+    print(f"✅ Lead name: {lead_name}, phone: {phone_number}")
     
     if "udipth" in lead_name and phone_number:
         await initiate_call(lead_id=lead_id, to_number=phone_number)
