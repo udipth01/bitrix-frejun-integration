@@ -8,6 +8,13 @@ from contextlib import asynccontextmanager
 
 load_dotenv()
 
+from supabase import create_client, Client
+
+supabase_url = os.getenv("SUPABASE_URL")
+supabase_key = os.getenv("SUPABASE_KEY")
+
+supabase: Client = create_client(supabase_url, supabase_key)
+
 
 logging.basicConfig(level=logging.INFO, stream=sys.stdout,
 format="%(asctime)s [%(levelname)s] %(name)s: %(message)s")
