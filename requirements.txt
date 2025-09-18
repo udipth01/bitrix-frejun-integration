@@ -3,4 +3,4 @@ uvicorn
 httpx
 python-dotenv
 teler
-frejun
+supabase
